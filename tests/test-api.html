@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Тест API курсов валют</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+    .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    .success { background-color: #d4edda; border-color: #c3e6cb; }
+    .error { background-color: #f8d7da; border-color: #f5c6cb; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 3px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Тест API курсов валют</h1>
+  
+  <div class="test-section">
+    <h2>1. Проверка подключения к API</h2>
+    <button onclick="testAPI()">Запустить тест</button>
+    <div id="api-result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>2. Проверка расчета курсов</h2>
+    <div id="rates-result"></div>
+  </div>
+
+  <script>
+    const APP_ID = "6f5840b11d7243d8a8857734a0245984";
+
+    async function testAPI() {
+      const resultDiv = document.getElementById('api-result');
+      resultDiv.innerHTML = '<p>⏳ Загрузка...</p>';
+
+      try {
+        const url = `https://openexchangerates.org/api/latest.json?app_id=${APP_ID}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const rates = data.rates;
+
+        // Проверка наличия валют
+        if (!rates.HUF || !rates.EUR || !rates.RSD) {
+          resultDiv.innerHTML = `
+            <div class="error">
+              <p>❌ Ошибка: Не найдены валюты в API</p>
+              <p>HUF: ${rates.HUF ? '✓' : '✗'}</p>
+              <p>EUR: ${rates.EUR ? '✓' : '✗'}</p>
+              <p>RSD: ${rates.RSD ? '✓' : '✗'}</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Расчет курсов
+        const rate_hufeur = rates.EUR / rates.HUF;
+        const rate_eurrsd = rates.RSD / rates.EUR;
+
+        resultDiv.innerHTML = `
+          <div class="success">
+            <p>✅ API работает корректно!</p>
+            <h3>Курсы валют (через USD):</h3>
+            <ul>
+              <li>USD/HUF: ${rates.HUF.toFixed(4)}</li>
+              <li>USD/EUR: ${rates.EUR.toFixed(4)}</li>
+              <li>USD/RSD: ${rates.RSD.toFixed(4)}</li>
+            </ul>
+            <h3>Рассчитанные курсы:</h3>
+            <ul>
+              <li><strong>HUF → EUR:</strong> ${rate_hufeur.toFixed(8)}</li>
+              <li><strong>EUR → RSD:</strong> ${rate_eurrsd.toFixed(4)}</li>
+            </ul>
+            <h3>Примеры конвертации:</h3>
+            <ul>
+              <li>1000 HUF = ${(1000 * rate_hufeur).toFixed(2)} EUR</li>
+              <li>100 EUR = ${(100 * rate_eurrsd).toFixed(2)} RSD</li>
+              <li>1000 HUF = ${(1000 * rate_hufeur * rate_eurrsd).toFixed(2)} RSD</li>
+            </ul>
+            <pre>${JSON.stringify({ rate_hufeur, rate_eurrsd }, null, 2)}</pre>
+          </div>
+        `;
+
+        // Обновляем второй тест
+        document.getElementById('rates-result').innerHTML = `
+          <div class="success">
+            <p>✅ Курсы рассчитаны успешно!</p>
+            <p>Эти значения будут использоваться в расширении.</p>
+          </div>
+        `;
+
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <div class="error">
+            <p>❌ Ошибка при запросе к API:</p>
+            <pre>${error.message}</pre>
+            <p>Проверьте:</p>
+            <ul>
+              <li>Интернет-соединение</li>
+              <li>Правильность APP_ID</li>
+              <li>Доступность API openexchangerates.org</li>
+            </ul>
+          </div>
+        `;
+      }
+    }
+
+    // Автоматически запускаем тест при загрузке
+    window.addEventListener('load', () => {
+      setTimeout(testAPI, 500);
+    });
+  </script>
+</body>
+</html>
+

@@ -2,13 +2,34 @@ document.addEventListener("DOMContentLoaded", () => {
 	const hufeurInput = document.getElementById("hufeur");
 	const eurrsdInput = document.getElementById("eurrsd");
 	const saveBtn = document.getElementById("save");
+	const autoRatesCheckbox = document.getElementById("autoRates");
 	const stts = document.getElementById("status");
-	// Load saved formulas
-	chrome.storage.local.get(["hufeur", "eurrsd"], (data) => {
-	hufeurInput.value = data.hufeur || "/392*0.917";
-	eurrsdInput.value = data.eurrsd || "*117.5";
+	
+	// Load saved settings
+	chrome.storage.local.get(["hufeur", "eurrsd", "autoRates"], (data) => {
+		hufeurInput.value = data.hufeur || "/392*0.917";
+		eurrsdInput.value = data.eurrsd || "*117.5";
+		autoRatesCheckbox.checked = data.autoRates || false;
+		if (data.autoRates) {
+			hufeurInput.disabled = true;
+			eurrsdInput.disabled = true;
+		}
 	});
-	// Save handler
+	
+	// Обработчик изменения чекбокса
+	autoRatesCheckbox.addEventListener('change', (e) => {
+		if (e.target.checked) {
+			hufeurInput.disabled = true;
+			eurrsdInput.disabled = true;
+			chrome.storage.local.set({ autoRates: true });
+			setStatus("Auto-update enabled. Rates will update every 12 hours.", "green");
+		} else {
+			hufeurInput.disabled = false;
+			eurrsdInput.disabled = false;
+			chrome.storage.local.set({ autoRates: false });
+			setStatus("Auto-update disabled.", "blue");
+		}
+	});
 	
 function parseFormula(formula) {
 	if (!formula || typeof formula !== 'string') return NaN;
@@ -66,6 +87,12 @@ function setStatus(txt, color, type) {
 
 
 	saveBtn.addEventListener('click', () => {
+		// Если авто-режим включен, не сохраняем формулы
+		if (autoRatesCheckbox.checked) {
+			setStatus("Auto-update is enabled. Manual rates are disabled.", "blue");
+			return;
+		}
+
 		const hufeurFormula = hufeurInput.value.trim();
 		const eurrsdFormula = eurrsdInput.value.trim();
 
@@ -80,9 +107,16 @@ function setStatus(txt, color, type) {
 				hufeur: hufeurFormula,
 				eurrsd: eurrsdFormula,
 				rate_hufeur,
-				rate_eurrsd
+				rate_eurrsd,
+				autoRates: false
 			}, () => {
 			setStatus("Saved!", "green");
+			// Отправляем сообщение для обновления цен на странице
+			chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+				if (tabs[0]) {
+					chrome.tabs.sendMessage(tabs[0].id, {action: "updateRates"});
+				}
+			});
 			});
 
 		} catch (e) {

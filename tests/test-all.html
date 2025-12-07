@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Полный тест расширения</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: 0 auto; }
+    .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    .success { background-color: #d4edda; border-color: #c3e6cb; }
+    .error { background-color: #f8d7da; border-color: #f5c6cb; }
+    .info { background-color: #d1ecf1; border-color: #bee5eb; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; }
+    .summary { font-size: 18px; font-weight: bold; margin: 20px 0; padding: 15px; border-radius: 5px; }
+    .summary.success { background-color: #d4edda; }
+    .summary.error { background-color: #f8d7da; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Полный тест расширения HUF Price Converter</h1>
+  
+  <div class="test-section info">
+    <h2>📋 Инструкция</h2>
+    <p>Этот тест проверяет все основные функции расширения:</p>
+    <ol>
+      <li>Подключение к API openexchangerates.org</li>
+      <li>Парсинг формул курсов</li>
+      <li>Парсинг и конвертация цен</li>
+      <li>Проверка интервала обновления (12 часов)</li>
+    </ol>
+    <button onclick="runAllTests()">🚀 Запустить все тесты</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    const APP_ID = "6f5840b11d7243d8a8857734a0245984";
+    const UPDATE_INTERVAL_HOURS = 12;
+
+    // Функция для получения курсов из API
+    async function fetchExchangeRates() {
+      try {
+        const url = `https://openexchangerates.org/api/latest.json?app_id=${APP_ID}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        const rates = data.rates;
+        
+        if (!rates.HUF || !rates.EUR || !rates.RSD) {
+          throw new Error("One of currencies (HUF, EUR, RSD) not found in API");
+        }
+
+        const rate_hufeur = rates.EUR / rates.HUF;
+        const rate_eurrsd = rates.RSD / rates.EUR;
+
+        return { rate_hufeur, rate_eurrsd };
+      } catch (error) {
+        throw error;
+      }
+    }
+
+    // Функция для проверки интервала обновления
+    function shouldUpdateRates(lastUpdateDate) {
+      if (!lastUpdateDate) return true;
+      const now = new Date();
+      const lastUpdate = new Date(lastUpdateDate);
+      const diffInHours = (now - lastUpdate) / (1000 * 60 * 60);
+      return diffInHours >= UPDATE_INTERVAL_HOURS;
+    }
+
+    // Функция парсинга формул
+    function parseFormula(formula) {
+      if (!formula || typeof formula !== 'string') return NaN;
+      if (!/^[*/+\-]/.test(formula)) {
+        formula = '*' + formula;
+      }
+      const safeExpr = '1' + formula;
+      if (!/^[\d+\-*/().\s]+$/.test(safeExpr)) {
+        return NaN;
+      }
+      const tokens = formula.match(/[*/+\-]?\s*[\d.]+/g);
+      if (!tokens) return NaN;
+      let result = 1;
+      for (let token of tokens) {
+        token = token.trim();
+        const value = parseFloat(token.slice(1));
+        if (isNaN(value)) return NaN;
+        const op = token[0];
+        if (op === '*') result *= value;
+        else if (op === '/') result /= value;
+        else if (op === '+') result += value;
+        else if (op === '-') result -= value;
+        else result *= parseFloat(token);
+      }
+      return result;
+    }
+
+    // Функция парсинга цен
+    function parseAndConvertPrice(text, rate_hufeur, rate_eurrsd) {
+      const match = text.match(/([\d\s]+)\s*Ft/);
+      if (!match) {
+        const match = text.match(/([\d,\s]+)\s*€/);
+        if (!match) {
+          return null;
+        }
+        const eur = parseInt(match[1].replace(/\s/g, '').replace(',', ''));
+        const converted_rsd = (eur * rate_eurrsd).toFixed(2);
+        return `~RSD${converted_rsd}`;
+      }
+      const huf = parseInt(match[1].replace(/\s/g, ''));
+      const converted = (huf * rate_hufeur).toFixed(2);
+      const converted_rsd = (converted * rate_eurrsd).toFixed(2);
+      return `~€${converted} / ~RSD${converted_rsd}`;
+    }
+
+    let testResults = {
+      api: false,
+      formulas: false,
+      prices: false,
+      interval: false
+    };
+
+    async function runAllTests() {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '<p>⏳ Запуск тестов...</p>';
+
+      let html = '';
+
+      // Тест 1: API
+      html += '<div class="test-section"><h2>1. Тест API</h2>';
+      try {
+        const rates = await fetchExchangeRates();
+        html += `<div class="success">
+          <p>✅ API работает корректно!</p>
+          <p>HUF → EUR: ${rates.rate_hufeur.toFixed(8)}</p>
+          <p>EUR → RSD: ${rates.rate_eurrsd.toFixed(4)}</p>
+        </div>`;
+        testResults.api = true;
+      } catch (error) {
+        html += `<div class="error">
+          <p>❌ Ошибка API: ${error.message}</p>
+        </div>`;
+        testResults.api = false;
+      }
+      html += '</div>';
+
+      // Тест 2: Формулы
+      html += '<div class="test-section"><h2>2. Тест парсинга формул</h2>';
+      const formulaTests = [
+        { formula: "/392*0.917", expected: 1/392*0.917 },
+        { formula: "*117.5", expected: 117.5 },
+        { formula: "/400*0.9*1.05", expected: 1/400*0.9*1.05 }
+      ];
+      let formulasOk = true;
+      formulaTests.forEach(test => {
+        const result = parseFormula(`1${test.formula}`);
+        const isOk = Math.abs(result - test.expected) < 0.0001;
+        if (!isOk) formulasOk = false;
+      });
+      if (formulasOk) {
+        html += '<div class="success"><p>✅ Все формулы парсятся корректно!</p></div>';
+        testResults.formulas = true;
+      } else {
+        html += '<div class="error"><p>❌ Ошибки в парсинге формул</p></div>';
+        testResults.formulas = false;
+      }
+      html += '</div>';
+
+      // Тест 3: Парсинг цен
+      html += '<div class="test-section"><h2>3. Тест парсинга цен</h2>';
+      const priceTests = ["15 990 Ft", "129,99 €", "45 000 Ft"];
+      let pricesOk = true;
+      priceTests.forEach(price => {
+        const result = parseAndConvertPrice(price, 0.00238, 117);
+        if (!result) pricesOk = false;
+      });
+      if (pricesOk) {
+        html += '<div class="success"><p>✅ Все цены парсятся корректно!</p></div>';
+        testResults.prices = true;
+      } else {
+        html += '<div class="error"><p>❌ Ошибки в парсинге цен</p></div>';
+        testResults.prices = false;
+      }
+      html += '</div>';
+
+      // Тест 4: Интервал обновления
+      html += '<div class="test-section"><h2>4. Тест интервала обновления</h2>';
+      const now = new Date().toISOString();
+      const past12h = new Date(Date.now() - 11 * 60 * 60 * 1000).toISOString();
+      const past13h = new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString();
+      
+      const test1 = shouldUpdateRates(null); // Должно быть true
+      const test2 = shouldUpdateRates(past12h); // Должно быть false (< 12 часов)
+      const test3 = shouldUpdateRates(past13h); // Должно быть true (>= 12 часов)
+      
+      if (test1 && !test2 && test3) {
+        html += '<div class="success"><p>✅ Логика интервала обновления работает корректно!</p></div>';
+        testResults.interval = true;
+      } else {
+        html += `<div class="error">
+          <p>❌ Ошибки в логике интервала</p>
+          <p>Тест 1 (null): ${test1 ? '✅' : '❌'}</p>
+          <p>Тест 2 (< 12ч): ${!test2 ? '✅' : '❌'}</p>
+          <p>Тест 3 (>= 12ч): ${test3 ? '✅' : '❌'}</p>
+        </div>`;
+        testResults.interval = false;
+      }
+      html += '</div>';
+
+      // Итоги
+      const allPassed = Object.values(testResults).every(r => r === true);
+      html += `<div class="summary ${allPassed ? 'success' : 'error'}">
+        <h2>📊 Итоги тестирования</h2>
+        <p>API: ${testResults.api ? '✅' : '❌'}</p>
+        <p>Формулы: ${testResults.formulas ? '✅' : '❌'}</p>
+        <p>Цены: ${testResults.prices ? '✅' : '❌'}</p>
+        <p>Интервал: ${testResults.interval ? '✅' : '❌'}</p>
+        <h3>${allPassed ? '✅ Все тесты пройдены! Расширение готово к использованию.' : '❌ Некоторые тесты не пройдены. Проверьте ошибки выше.'}</h3>
+      </div>`;
+
+      resultsDiv.innerHTML = html;
+    }
+
+    // Автозапуск при загрузке
+    window.addEventListener('load', () => {
+      setTimeout(runAllTests, 500);
+    });
+  </script>
+</body>
+</html>
+

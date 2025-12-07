@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Тест парсинга цен</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+    .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    .success { background-color: #d4edda; border-color: #c3e6cb; }
+    .error { background-color: #f8d7da; border-color: #f5c6cb; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+    th { background-color: #f2f2f2; }
+    input { width: 300px; padding: 5px; margin: 5px 0; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Тест парсинга цен</h1>
+  
+  <div class="test-section">
+    <h2>Проверка функции parseAndConvertPrice</h2>
+    <p>Эта функция используется в content.js для конвертации цен</p>
+    
+    <table>
+      <thead>
+        <tr>
+          <th>Исходный текст</th>
+          <th>Результат конвертации</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody id="test-results"></tbody>
+    </table>
+  </div>
+
+  <div class="test-section">
+    <h2>Интерактивный тест</h2>
+    <p>Введите текст с ценой (например: "15 990 Ft" или "129,99 €"):</p>
+    <input type="text" id="price-input" placeholder="15 990 Ft" value="15 990 Ft">
+    <br>
+    <button onclick="testCustomPrice()">Проверить цену</button>
+    <div id="custom-result" style="margin-top: 10px;"></div>
+  </div>
+
+  <script>
+    // Тестовые курсы
+    let rate_hufeur = 0.00238392857142857142857142857143;
+    let rate_eurrsd = 117;
+
+    function parseAndConvertPrice(text) {
+      const match = text.match(/([\d\s]+)\s*Ft/);
+      if (!match) {
+        const match = text.match(/([\d,\s]+)\s*€/);
+        if (!match) {
+          console.log("[IponPrices] ❌ Could not parse:", text);
+          return null;
+        }
+        const eur = parseInt(match[1].replace(/\s/g, '').replace(',', ''));
+        const converted_rsd = (eur * rate_eurrsd).toFixed(2);
+        return `~RSD${converted_rsd}`;
+      }
+      const huf = parseInt(match[1].replace(/\s/g, ''));
+      const converted = (huf * rate_hufeur).toFixed(2);
+      const converted_rsd = (converted * rate_eurrsd).toFixed(2);
+      return `~€${converted} / ~RSD${converted_rsd}`;
+    }
+
+    const testCases = [
+      "15 990 Ft",
+      "129,99 €",
+      "45 000 Ft",
+      "299,50 €",
+      "1 000 Ft",
+      "50 €",
+      "123456 Ft",
+      "999,99 €"
+    ];
+
+    function runTests() {
+      const tbody = document.getElementById('test-results');
+      tbody.innerHTML = '';
+
+      testCases.forEach(testText => {
+        const result = parseAndConvertPrice(testText);
+        const isSuccess = result !== null;
+        
+        const row = document.createElement('tr');
+        row.className = isSuccess ? 'success' : 'error';
+        row.innerHTML = `
+          <td><code>${testText}</code></td>
+          <td>${result || 'Не удалось распарсить'}</td>
+          <td>${isSuccess ? '✅' : '❌'}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function testCustomPrice() {
+      const input = document.getElementById('price-input').value.trim();
+      const resultDiv = document.getElementById('custom-result');
+      
+      if (!input) {
+        resultDiv.innerHTML = '<p style="color: red;">Введите цену!</p>';
+        return;
+      }
+
+      const result = parseAndConvertPrice(input);
+      
+      if (!result) {
+        resultDiv.innerHTML = `
+          <div class="error">
+            <p>❌ Не удалось распарсить цену: <code>${input}</code></p>
+            <p>Формат должен быть: "число Ft" или "число €"</p>
+            <p>Примеры: "15 990 Ft", "129,99 €"</p>
+          </div>
+        `;
+      } else {
+        resultDiv.innerHTML = `
+          <div class="success">
+            <p>✅ Цена успешно распарсена!</p>
+            <p>Исходная цена: <code>${input}</code></p>
+            <p>Конвертированная цена: <strong>${result}</strong></p>
+            <p>Это значение будет показано при наведении на цену в расширении.</p>
+          </div>
+        `;
+      }
+    }
+
+    // Запускаем тесты при загрузке
+    window.addEventListener('load', runTests);
+  </script>
+</body>
+</html>
+

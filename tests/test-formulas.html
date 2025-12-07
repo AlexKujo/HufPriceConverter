@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Тест парсинга формул</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+    .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    .success { background-color: #d4edda; border-color: #c3e6cb; }
+    .error { background-color: #f8d7da; border-color: #f5c6cb; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+    th { background-color: #f2f2f2; }
+    input { width: 200px; padding: 5px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Тест парсинга формул</h1>
+  
+  <div class="test-section">
+    <h2>Проверка функции parseFormula</h2>
+    <p>Эта функция используется в popup.js для парсинга формул курсов</p>
+    
+    <table>
+      <thead>
+        <tr>
+          <th>Формула</th>
+          <th>Ожидаемый результат</th>
+          <th>Фактический результат</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody id="test-results"></tbody>
+    </table>
+  </div>
+
+  <div class="test-section">
+    <h2>Интерактивный тест</h2>
+    <input type="text" id="formula-input" placeholder="/392*0.917" value="/392*0.917">
+    <button onclick="testCustomFormula()">Проверить формулу</button>
+    <div id="custom-result" style="margin-top: 10px;"></div>
+  </div>
+
+  <script>
+    function parseFormula(formula) {
+      if (!formula || typeof formula !== 'string') return NaN;
+
+      // Prepend '*' if it doesn't start with an operator
+      if (!/^[*/+\-]/.test(formula)) {
+        formula = '*' + formula;
+      }
+
+      const safeExpr = '1' + formula;
+
+      // Validate entire expression contains only math-friendly characters
+      if (!/^[\d+\-*/().\s]+$/.test(safeExpr)) {
+        return NaN; // Invalid characters found
+      }
+
+      // Tokenize and compute
+      const tokens = formula.match(/[*/+\-]?\s*[\d.]+/g);
+      if (!tokens) return NaN;
+
+      let result = 1;
+      for (let token of tokens) {
+        token = token.trim();
+        const value = parseFloat(token.slice(1));
+        if (isNaN(value)) return NaN;
+
+        const op = token[0];
+        if (op === '*') result *= value;
+        else if (op === '/') result /= value;
+        else if (op === '+') result += value;
+        else if (op === '-') result -= value;
+        else result *= parseFloat(token); // Fallback
+      }
+
+      return result;
+    }
+
+    const testCases = [
+      { formula: "/392*0.917", expected: 1/392*0.917 },
+      { formula: "*117.5", expected: 117.5 },
+      { formula: "/400*0.9*1.05", expected: 1/400*0.9*1.05 },
+      { formula: "*0.0023625", expected: 0.0023625 },
+      { formula: "/100", expected: 0.01 },
+      { formula: "*2.5", expected: 2.5 },
+    ];
+
+    function runTests() {
+      const tbody = document.getElementById('test-results');
+      tbody.innerHTML = '';
+
+      testCases.forEach(test => {
+        const result = parseFormula(test.formula);
+        const actual = parseFormula(`1${test.formula}`);
+        const isCorrect = Math.abs(actual - test.expected) < 0.0001;
+        
+        const row = document.createElement('tr');
+        row.className = isCorrect ? 'success' : 'error';
+        row.innerHTML = `
+          <td><code>${test.formula}</code></td>
+          <td>${test.expected.toFixed(8)}</td>
+          <td>${actual.toFixed(8)}</td>
+          <td>${isCorrect ? '✅' : '❌'}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function testCustomFormula() {
+      const input = document.getElementById('formula-input').value.trim();
+      const resultDiv = document.getElementById('custom-result');
+      
+      if (!input) {
+        resultDiv.innerHTML = '<p style="color: red;">Введите формулу!</p>';
+        return;
+      }
+
+      const result = parseFormula(`1${input}`);
+      
+      if (isNaN(result)) {
+        resultDiv.innerHTML = `
+          <div class="error">
+            <p>❌ Неверная формула: <code>${input}</code></p>
+            <p>Формула должна содержать только математические операторы и числа.</p>
+          </div>
+        `;
+      } else {
+        resultDiv.innerHTML = `
+          <div class="success">
+            <p>✅ Формула корректна!</p>
+            <p>Результат: <strong>${result.toFixed(8)}</strong></p>
+            <p>Это означает: 1 единица базовой валюты = ${result.toFixed(8)} единиц целевой валюты</p>
+          </div>
+        `;
+      }
+    }
+
+    // Запускаем тесты при загрузке
+    window.addEventListener('load', runTests);
+  </script>
+</body>
+</html>
+

@@ -1,10 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "HUF Price Converter",
-  "version": "0.12",
-  "description": "Converts HUF prices on selected sites.",
+  "name": "HUF Price Converter fork by @AlexKujo",
+  "version": "0.12.1",
+  "description": "Converts HUF prices on selected sites. (EUR, RSD, RUB)",
   "permissions": [
   "storage"
+  ],
+  "host_permissions": [
+    "https://openexchangerates.org/*"
   ],
   "action": {
   "default_popup": "popup.html"
@@ -16,7 +19,7 @@
         "https://ipon.hu/*",
 		"https://iponcomp.hr/*"
       ],
-      "js": ["content.js"],
+      "js": ["config.js", "content.js"],
       "run_at": "document_idle"
     }
   ],
